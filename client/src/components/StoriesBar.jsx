@@ -14,7 +14,7 @@ const StoriesBar = () => {
 
     const [stories, setStories] = useState([])
     const [showModal, setShowModal] = useState(false)
-    const [viewStory, setViewStory] = useState(null)
+    const [viewerData, setViewerData] = useState(null)
 
     const fetchStories = async () => {
         try {
@@ -37,48 +37,105 @@ const StoriesBar = () => {
         fetchStories()
     },[])
 
-  return (
-    <div className='w-screen sm:w-[calc(100vw-240px)] lg:max-w-2xl no-scrollbar overflow-x-auto px-4'>
+    // Group stories by user (like Instagram)
+    const groupedStories = stories.reduce((groups, story) => {
+        const userId = story.user._id
+        if (!groups[userId]) {
+            groups[userId] = {
+                user: story.user,
+                stories: [story],
+                latestStory: story
+            }
+        } else {
+            groups[userId].stories.push(story)
+            // Keep the latest story as the preview
+            if (new Date(story.createdAt) > new Date(groups[userId].latestStory.createdAt)) {
+                groups[userId].latestStory = story
+            }
+        }
+        return groups
+    }, {})
 
-        <div className='flex gap-4 pb-5'>
-            {/* Add Story Card */}
-            <div onClick={()=>setShowModal(true)} className='rounded-lg shadow-sm min-w-30 max-w-30 max-h-40 aspect-[3/4] cursor-pointer hover:shadow-lg transition-all duration-200 border-2 border-dashed border-indigo-300 bg-gradient-to-b from-indigo-50 to-white'>
-                <div className='h-full flex flex-col items-center justify-center p-4'>
-                    <div className='size-10 bg-indigo-500 rounded-full flex items-center justify-center mb-3'>
-                        <Plus className='w-5 h-5 text-white'/>
+    const userStoryGroups = Object.values(groupedStories)
+
+    const handleStoryClick = (userGroup) => {
+        // Find the index of the first story from this user in the full stories array
+        const firstStoryIndex = stories.findIndex(story => story.user._id === userGroup.user._id)
+        setViewerData({
+            stories: stories,
+            initialStoryIndex: firstStoryIndex
+        })
+    }
+
+  return (
+    <div className='w-full max-w-lg mx-auto lg:max-w-none bg-white lg:bg-transparent p-4 lg:px-0 border-b border-gray-200 lg:border-none'>
+        <div className='flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar pb-2 px-1'>
+            {/* Add Story Card - Your Story */}
+            <div
+                onClick={()=>setShowModal(true)}
+                className='flex-shrink-0 w-16 flex flex-col items-center cursor-pointer group'
+            >
+                <div className='relative'>
+                    <div className='w-14 h-14 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-gray-200 group-hover:border-gray-300 transition-colors'>
+                        <Plus className='w-6 h-6 text-gray-600'/>
                     </div>
-                    <p className='text-sm font-medium text-slate-700 text-center'>Create Story</p>
                 </div>
+                <span className='text-xs text-gray-900 mt-1 text-center truncate w-full'>Your Story</span>
             </div>
-            {/* Story Cards */}
+
+            {/* Story Cards - Grouped by User - Instagram Style */}
             {
-                stories.map((story, index)=> (
-                    <div onClick={()=> setViewStory(story)} key={index} className={`relative rounded-lg shadow min-w-30 max-w-30 max-h-40 cursor-pointer hover:shadow-lg transition-all duration-200 bg-gradient-to-b from-indigo-500 to-purple-600 hover:from-indigo-700 hover:to-purple-800 active:scale-95`}>
-                        <img src={story.user.profile_picture} alt="" className='absolute size-8 top-3 left-3 z-10 rounded-full ring ring-gray-100 shadow'/>
-                        <p className='absolute top-18 left-3 text-white/60 text-sm truncate max-w-24'>{story.content}</p>
-                        <p className='text-white absolute bottom-1 right-2 z-10 text-xs'>{moment(story.createdAt).fromNow()}</p>
-                        {
-                            story.media_type !== 'text' && (
-                                <div className='absolute inset-0 z-1 rounded-lg bg-black overflow-hidden'>
-                                    {
-                                        story.media_type === "image" ? 
-                                        <img src={story.media_url} alt="" className='h-full w-full object-cover hover:scale-110 transition duration-500 opacity-70 hover:opacity-80'/>
-                                        : 
-                                        <video src={story.media_url} className='h-full w-full object-cover hover:scale-110 transition duration-500 opacity-70 hover:opacity-80'/>
-                                    }
+                userStoryGroups.map((userGroup, index) => {
+                    const latestStory = userGroup.latestStory
+                    const storyCount = userGroup.stories.length
+
+                    return (
+                        <div
+                            onClick={() => handleStoryClick(userGroup)}
+                            key={index}
+                            className='flex-shrink-0 w-16 flex flex-col items-center cursor-pointer group'
+                        >
+                            <div className='relative'>
+                                {/* Story Ring - Instagram gradient */}
+                                <div className='w-16 h-16 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500 p-0.5'>
+                                    <div className='w-full h-full rounded-full bg-white p-0.5'>
+                                        <img
+                                            src={latestStory.user.profile_picture}
+                                            alt={latestStory.user.full_name}
+                                            className='w-full h-full rounded-full object-cover'
+                                        />
+                                    </div>
                                 </div>
-                            )
-                        }
-                        
-                    </div>
-                ))
+
+                                {/* Story Count Badge */}
+                                {storyCount > 1 && (
+                                    <div className='absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center border-2 border-white'>
+                                        {storyCount}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Username */}
+                            <span className='text-xs text-gray-900 mt-1 text-center truncate w-full px-1'>
+                                {latestStory.user.username}
+                            </span>
+                        </div>
+                    )
+                })
             }
         </div>
 
         {/* Add Story Modal */}
         {showModal && <StoryModal setShowModal={setShowModal} fetchStories={fetchStories}/>}
+
         {/* View Story Modal */}
-        {viewStory && <StoryViewer viewStory={viewStory} setViewStory={setViewStory}/>}
+        {viewerData && (
+            <StoryViewer
+                stories={viewerData.stories}
+                initialStoryIndex={viewerData.initialStoryIndex}
+                onClose={() => setViewerData(null)}
+            />
+        )}
       
     </div>
   )

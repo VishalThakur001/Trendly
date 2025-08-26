@@ -5,12 +5,14 @@ import { useEffect } from 'react'
 import Loading from '../components/Loading'
 import UserProfileInfo from '../components/UserProfileInfo'
 import PostCard from '../components/PostCard'
+import ProfilePostsGrid from '../components/ProfilePostsGrid'
 import moment from 'moment'
 import ProfileModal from '../components/ProfileModal'
 import { useAuth } from '@clerk/clerk-react'
 import api from '../api/axios'
 import toast from 'react-hot-toast'
 import { useSelector } from 'react-redux'
+import { Grid3x3, List } from 'lucide-react'
 
 const Profile = () => {
 
@@ -20,8 +22,8 @@ const Profile = () => {
   const {profileId} = useParams()
   const [user, setUser] = useState(null)
   const [posts, setPosts] = useState([])
-  const [activeTab, setActiveTab] = useState('posts')
   const [showEdit, setShowEdit] = useState(false)
+  const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
 
   const fetchUser = async (profileId) => {
     const token = await getToken()
@@ -61,40 +63,67 @@ const Profile = () => {
           <UserProfileInfo user={user} posts={posts} profileId={profileId} setShowEdit={setShowEdit}/>
         </div>
 
-        {/* Tabs */}
+        {/* Posts Section */}
         <div className='mt-6'>
-          <div className='bg-white rounded-xl shadow p-1 flex max-w-md mx-auto'>
-            {["posts", "media", "likes"].map((tab)=>(
-              <button onClick={()=> setActiveTab(tab)} key={tab} className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${activeTab === tab ? "bg-indigo-600 text-white" : "text-gray-600 hover:text-gray-900"}`}>
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          {/* View Toggle Tabs */}
+          <div className='flex justify-center border-b border-gray-200 mb-6'>
+            <div className='flex bg-gray-100 rounded-lg p-1'>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Grid3x3 className='w-4 h-4' />
+                Grid
               </button>
-            ))}
+              <button
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <List className='w-4 h-4' />
+                List
+              </button>
+            </div>
           </div>
-          {/* Posts */}
-          {activeTab === 'posts' && (
-            <div className='mt-6 flex flex-col items-center gap-6'>
-              {posts.map((post)=> <PostCard key={post._id} post={post}/>)}
-            </div>
-          )}
 
-        {/* Media */}
-          {activeTab === 'media' && (
-            <div className='flex flex-wrap mt-6 max-w-6xl'>
-              {
-                posts.filter((post)=>post.image_urls.length > 0).map((post)=>(
-                  <>
-                  {post.image_urls.map((image, index)=>(
-                    <Link target='_blank' to={image} key={index} className='relative group'>
-                      <img src={image} key={index} className='w-64 aspect-video object-cover' alt="" />
-                      <p className='absolute bottom-0 right-0 text-xs p-1 px-3 backdrop-blur-xl text-white opacity-0 group-hover:opacity-100 transition duration-300'>Posted {moment(post.createdAt).fromNow()}</p>
-                    </Link>
-                  ))}
-                  </>
-                ))
-              }
+          {/* Posts Count */}
+          <div className='text-center mb-6'>
+            <span className='text-gray-600 text-sm'>
+              {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+            </span>
+          </div>
+
+          {/* Posts Display */}
+          {posts.length > 0 ? (
+            viewMode === 'grid' ? (
+              <ProfilePostsGrid posts={posts} user={user} />
+            ) : (
+              <div className='max-w-lg mx-auto space-y-6'>
+                {posts.map((post) => (
+                  <PostCard key={post._id} post={post} />
+                ))}
+              </div>
+            )
+          ) : (
+            <div className='text-center py-12'>
+              <div className='w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4'>
+                <Grid3x3 className='w-10 h-10 text-gray-400' />
+              </div>
+              <h3 className='text-lg font-medium text-gray-900 mb-2'>No Posts Yet</h3>
+              <p className='text-gray-600 text-sm'>
+                {profileId === currentUser._id || !profileId
+                  ? "Share your first post to get started!"
+                  : "This user hasn't shared any posts yet."}
+              </p>
             </div>
           )}
-        
         </div>
       </div>
       {/* Edit Profile Modal */}

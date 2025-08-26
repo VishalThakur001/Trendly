@@ -4,7 +4,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import MenuItems from './MenuItems'
 import { CirclePlus, LogOut } from 'lucide-react'
 import {UserButton, useClerk} from '@clerk/clerk-react'
-import { useSelector } from 'react-redux';
+import { useSelector } from 'react-redux'
+import NotificationPanel from './NotificationPanel';
 
 const Sidebar = ({sidebarOpen, setSidebarOpen}) => {
 
@@ -26,6 +27,8 @@ const Sidebar = ({sidebarOpen, setSidebarOpen}) => {
             </Link>
       </div>
 
+
+        {/* Profile Section */}
         <div className='w-full border-t border-gray-200 p-4 px-7 flex items-center justify-between'>
             <div className='flex gap-2 items-center cursor-pointer'>
                 <UserButton />

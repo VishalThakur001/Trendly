@@ -11,7 +11,24 @@ import { clerkClient } from "@clerk/express";
 export const getUserData = async (req, res) => {
     try {
         const { userId } = req.auth()
-        const user = await User.findById(userId)
+        let user = await User.findById(userId)
+
+        // Create development user if it doesn't exist
+        if(!user && userId === 'dev_user_123'){
+            user = new User({
+                _id: 'dev_user_123',
+                full_name: 'Dev User',
+                username: 'devuser',
+                email: 'dev@example.com',
+                bio: 'Development user for testing',
+                location: 'Development',
+                profile_picture: 'https://via.placeholder.com/150',
+                cover_picture: 'https://via.placeholder.com/400x200'
+            })
+            await user.save()
+            console.log('Created development user')
+        }
+
         if(!user){
             return res.json({success: false, message: "User not found"})
         }
@@ -270,6 +287,95 @@ export const acceptConnectionRequest = async (req, res) => {
     }
 }
 
+
+// Get Suggested Connections
+export const getSuggestedConnections = async (req, res) => {
+    try {
+        const { userId } = req.auth();
+        const { limit = 20 } = req.query;
+
+        // Get current user with connections and pending requests
+        const currentUser = await User.findById(userId).populate('connections following');
+
+        if (!currentUser) {
+            return res.json({ success: false, message: "User not found" });
+        }
+
+        // Get all connection IDs to exclude (connections + following + pending requests)
+        const connectedUserIds = currentUser.connections.map(conn => conn._id.toString());
+        const followingUserIds = currentUser.following.map(follow => follow._id.toString());
+
+        // Get pending connection requests (both sent and received)
+        const pendingConnections = await Connection.find({
+            $or: [
+                { from_user_id: userId, status: 'pending' },
+                { to_user_id: userId, status: 'pending' }
+            ]
+        });
+
+        const pendingUserIds = pendingConnections.map(conn => {
+            return conn.from_user_id.toString() === userId
+                ? conn.to_user_id.toString()
+                : conn.from_user_id.toString();
+        });
+
+        // Combine all user IDs to exclude
+        const excludeUserIds = [
+            userId,
+            ...connectedUserIds,
+            ...followingUserIds,
+            ...pendingUserIds
+        ];
+
+        // Find suggested users - ONLY users with mutual connections
+        let suggestedUsers = [];
+
+        // Only show users with mutual connections
+        if (connectedUserIds.length > 0) {
+            suggestedUsers = await User.find({
+                _id: { $nin: excludeUserIds },
+                connections: { $in: connectedUserIds }
+            })
+            .sort({ createdAt: -1 }) // Sort by recently joined among mutual connections
+            .limit(parseInt(limit));
+        }
+
+        // Add connection stats for each suggested user
+        const suggestedUsersWithStats = await Promise.all(
+            suggestedUsers.map(async (user) => {
+                const mutualConnectionsCount = await User.countDocuments({
+                    _id: { $in: connectedUserIds },
+                    connections: user._id
+                });
+
+                // Get actual mutual connections for display
+                const mutualConnectionsData = mutualConnectionsCount > 0
+                    ? await User.find({
+                        _id: { $in: connectedUserIds },
+                        connections: user._id
+                    }).select('full_name username').limit(5)
+                    : [];
+
+                return {
+                    ...user.toObject(),
+                    mutualConnections: mutualConnectionsData,
+                    mutualConnectionsCount,
+                    connectionStatus: 'none' // none, pending, connected
+                };
+            })
+        );
+
+        res.json({
+            success: true,
+            suggestedUsers: suggestedUsersWithStats,
+            count: suggestedUsersWithStats.length
+        });
+
+    } catch (error) {
+        console.error('Error getting suggested connections:', error);
+        res.json({ success: false, message: "Failed to load suggested connections" });
+    }
+};
 
 // Get User Profiles
 export const getUserProfiles = async (req, res) =>{
